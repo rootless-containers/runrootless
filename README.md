@@ -63,13 +63,8 @@ sh-4.2# cowsay hello rootless world
 
 - apt-get seems flaky, while yum seems almost stable (CentOS 7). Setting env var `PROOT_NO_SECCOMP=1` may mitigate the issue. (Disables seccomp acceleration)
 - apk may not work
-- chown is not implemented yet
 
 ## Future work
-
-### Persistent chown
-
-The chowned stat should be saved using a continuity manifest or an xattr value.
 
 ### OCI Runtime Hook mode
 

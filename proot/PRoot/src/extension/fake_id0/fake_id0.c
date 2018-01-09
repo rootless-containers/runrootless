@@ -44,6 +44,14 @@
 #include "path/binding.h"
 #include "arch.h"
 
+#if defined(PERSISTENT_CHOWN)
+#include <unistd.h>
+#include <sys/xattr.h>
+#include "path/path.h"
+#define XATTR_USER_ROOTLESSCONTAINERS_UID "user.rootlesscontainers.uid"
+#define XATTR_USER_ROOTLESSCONTAINERS_GID "user.rootlesscontainers.gid"
+#endif
+
 typedef struct {
 	uid_t ruid;
 	uid_t euid;
@@ -231,7 +239,7 @@ static void override_permissions(const Tracee *tracee, const char *path, bool is
 
 /**
  * Adjust current @tracee's syscall parameters according to @config.
- * This function always returns 0.
+ * This function returns 0 unless there is an error.
  */
 static int handle_sysenter_end(Tracee *tracee, const Config *config)
 {
@@ -270,6 +278,13 @@ static int handle_sysenter_end(Tracee *tracee, const Config *config)
 		Reg gid_sysarg;
 		uid_t uid;
 		gid_t gid;
+#if defined(PERSISTENT_CHOWN)
+		int status;
+		int fd = -1; // shut up gcc uninitialization warning
+		char path[PATH_MAX];
+		char idstr[16];
+		bool with_path = (sysnum == PR_chown || sysnum == PR_chown32 || sysnum == PR_lchown || sysnum == PR_lchown32 || sysnum == PR_fchownat);
+#endif
 
 		if (sysnum == PR_fchownat) {
 			uid_sysarg = SYSARG_3;
@@ -283,6 +298,75 @@ static int handle_sysenter_end(Tracee *tracee, const Config *config)
 		uid = peek_reg(tracee, ORIGINAL, uid_sysarg);
 		gid = peek_reg(tracee, ORIGINAL, gid_sysarg);
 
+#if defined(PERSISTENT_CHOWN)
+		if (with_path) {
+			word_t input;
+			char guestpath[PATH_MAX];
+			int dirfd = AT_FDCWD;
+			if (sysnum == PR_fchownat) {
+				dirfd = peek_reg(tracee, ORIGINAL, SYSARG_1);
+				input = peek_reg(tracee, ORIGINAL, SYSARG_2);
+				status = read_path(tracee, guestpath, input);
+			} else {
+				input = peek_reg(tracee, ORIGINAL, SYSARG_1);
+				status = read_path(tracee, guestpath, input);
+			}
+			if (status < 0)
+				return status;
+			status = translate_path(tracee, path, dirfd, guestpath, false);
+			if (status < 0)
+				return status;
+		} else {
+			fd = peek_reg(tracee, ORIGINAL, SYSARG_1);
+		}
+
+		// TODO: use macro for deduplication?
+		if (uid != config->ruid) {
+			if ( uid != (uid_t)-1 ) {
+				snprintf(idstr, sizeof(idstr), "%d", uid);
+				if (with_path) {
+					lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID);
+					status = lsetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID, idstr, strlen(idstr), 0);
+				} else {
+					fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID);
+					status = fsetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID, idstr, strlen(idstr), 0);
+				}
+				if (status < 0)
+					return status;
+			}
+		} else { // uid == config->ruid
+			if (with_path) {
+				lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID);
+			} else {
+				fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID);
+			}
+		}
+
+		if (gid != config->rgid) {
+			if ( gid != (gid_t)-1 ) {
+				snprintf(idstr, sizeof(idstr), "%d", gid);
+				if (with_path) {
+					lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID);
+					status = lsetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID, idstr, strlen(idstr), 0);
+				} else {
+					fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID);
+					status = fsetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID, idstr, strlen(idstr), 0);
+				}
+				if (status < 0)
+					return status;
+			}
+		} else { // gid == config->rgid
+			if (with_path) {
+				lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID);
+			} else {
+				fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID);
+			}
+		}
+
+		/* this should always succeed */
+		poke_reg(tracee, uid_sysarg, getuid());
+		poke_reg(tracee, gid_sysarg, getgid());
+#else
 		/* Swap actual and emulated ids to get a chance of
 		 * success.  */
 		if (uid == config->ruid)
@@ -290,6 +374,7 @@ static int handle_sysenter_end(Tracee *tracee, const Config *config)
 		if (gid == config->rgid)
 			poke_reg(tracee, gid_sysarg, getgid());
 
+#endif
 		return 0;
 	}
 
@@ -624,6 +709,11 @@ static int handle_sysexit_end(Tracee *tracee, Config *config)
 		Reg sysarg;
 		uid_t uid;
 		gid_t gid;
+#if defined(PERSISTENT_CHOWN)
+		char uidstr[16], gidstr[16];
+		bool with_uid_xattr = false, with_gid_xattr=false;
+		bool with_path = !(sysnum == PR_fstat64 || sysnum == PR_fstat);
+#endif
 
 		/* Override only if it succeed.  */
 		result = peek_reg(tracee, CURRENT, SYSARG_RESULT);
@@ -658,6 +748,55 @@ static int handle_sysexit_end(Tracee *tracee, Config *config)
 
 		if (gid == getgid())
 			poke_uint32(tracee, address + offsetof_stat_gid(tracee), config->sgid);
+
+#if defined(PERSISTENT_CHOWN)
+		memset(&uidstr, 0, sizeof(uidstr)); // ensure nul-terminated string
+		memset(&gidstr, 0, sizeof(gidstr)); // ensure nul-terminated string
+		if (with_path) {
+			int status;
+			word_t input;
+			char path[PATH_MAX];
+			char guestpath[PATH_MAX];
+			int dirfd = AT_FDCWD;
+			if (sysnum == PR_fstatat64 || sysnum == PR_newfstatat) {
+				dirfd = peek_reg(tracee, ORIGINAL, SYSARG_1);
+				input = peek_reg(tracee, ORIGINAL, SYSARG_2);
+				status = read_path(tracee, guestpath, input);
+			} else {
+				input = peek_reg(tracee, ORIGINAL, SYSARG_1);
+				status = read_path(tracee, guestpath, input);
+			}
+			if (status < 0)
+				return status;
+			status = translate_path(tracee, path, dirfd, guestpath, false);
+			if (status < 0)
+				return status;
+			with_uid_xattr = lgetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID, &uidstr, sizeof(uidstr)) > 0;
+			with_gid_xattr = lgetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID, &gidstr, sizeof(gidstr)) > 0;
+		} else {
+			int fd = peek_reg(tracee, ORIGINAL, SYSARG_1);
+			with_uid_xattr = fgetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID, &uidstr, sizeof(uidstr)) > 0;
+			with_gid_xattr = fgetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID, &gidstr, sizeof(gidstr)) > 0;
+		}
+		if (with_uid_xattr) {
+			char *endptr;
+			uid_t uid_xattr = strtol(uidstr, &endptr, 10);
+			if (endptr == uidstr) {
+				errno = EINVAL;
+				return -1;
+			}
+			poke_uint32(tracee, address + offsetof_stat_uid(tracee), uid_xattr);
+		}
+		if (with_gid_xattr) {
+			char *endptr;
+			gid_t gid_xattr = strtol(gidstr, &endptr, 10);
+			if (endptr == gidstr) {
+				errno = EINVAL;
+				return -1;
+			}
+			poke_uint32(tracee, address + offsetof_stat_gid(tracee), gid_xattr);
+		}
+#endif
 
 		return 0;
 	}

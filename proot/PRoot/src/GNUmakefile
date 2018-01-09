@@ -15,6 +15,7 @@ OBJCOPY  = $(CROSS_COMPILE)objcopy
 OBJDUMP  = $(CROSS_COMPILE)objdump
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I. -I$(VPATH)
+CPPFLAGS += -DPERSISTENT_CHOWN
 CFLAGS   += -Wall -Wextra -O2
 LDFLAGS  += -L. -ltalloc -Wl,-z,noexecstack -static
 

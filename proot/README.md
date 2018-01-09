@@ -9,4 +9,13 @@ Note that the upstream version of PRoot ( https://github.com/proot-me/PRoot) is 
 
 ## Changes from the PRoot upstream
 
-- patches from udocker: https://github.com/jorge-lip/PRoot/commit/10ca3e88dc1d2e2b45439b181a168af6b4053b91
+### patches from udocker
+
+https://github.com/jorge-lip/PRoot/commit/10ca3e88dc1d2e2b45439b181a168af6b4053b91
+
+### persistent chown
+
+Following xattrs are used for storing decimal uid/gid strings:
+
+- `user.rootlesscontainers.uid`
+- `user.rootlesscontainers.gid`
