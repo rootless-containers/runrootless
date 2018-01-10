@@ -16,12 +16,13 @@ RUN go build -o /runrootless github.com/AkihiroSuda/runrootless
 
 FROM alpine:3.7
 RUN adduser -u 1000 -D user && mkdir -p -m 0700 /run/user/1000 && chown 1000:1000 /run/user/1000
+COPY --from=proot /proot /home/user/.runrootless/runrootless-proot
+COPY --from=runc /runc /home/user/bin/runc
+COPY --from=runrootless /runrootless /home/user/bin/runrootless
+COPY ./examples /home/user/examples
+RUN chown -R user /home/user
 USER user
 WORKDIR /home/user
 ENV PATH=/home/user/bin:$PATH
 ENV XDG_RUNTIME_DIR=/run/user/1000
-COPY --from=proot --chown=user /proot /home/user/.runrootless/runrootless-proot
-COPY --from=runc --chown=user /runc /home/user/bin/runc
-COPY --from=runrootless --chown=user /runrootless /home/user/bin/runrootless
-COPY --chown=user ./examples /home/user/examples
 # note: --privileged is required to run this container: https://github.com/opencontainers/runc/issues/1456
