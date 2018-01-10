@@ -52,6 +52,10 @@ sh-4.2# cowsay hello rootless world
                 ||     ||
 ```
 
+### Environment variables
+
+- `RUNROOTLESS_SECCOMP=1`: enable seccomp acceleration (unstable)
+
 ## How it works
 
 - Transform a regular `config.json` to rootless one, and create a new OCI runtime bundle with it.
@@ -61,8 +65,8 @@ sh-4.2# cowsay hello rootless world
 
 ## Known issues
 
-- apt-get seems flaky, while yum seems almost stable (CentOS 7). Setting env var `PROOT_NO_SECCOMP=1` may mitigate the issue. (Disables seccomp acceleration)
-- apk may not work
+- `apt` / `dpkg` may crash when seccomp acceleration is enabled: https://github.com/AkihiroSuda/runrootless/issues/4
+- apk may not work: https://github.com/AkihiroSuda/runrootless/issues/3
 
 ## Future work
 

@@ -3,6 +3,7 @@ package bundle
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/specconv"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -42,8 +43,9 @@ func injectPRoot(spec *specs.Spec) error {
 	)
 	spec.Process.Args = append([]string{"/dev/proot/proot", "-0"}, spec.Process.Args...)
 	spec.Process.Env = append(spec.Process.Env, "PROOT_TMP_DIR=/dev/proot")
-	if v := os.Getenv("PROOT_NO_SECCOMP"); v != "" {
-		spec.Process.Env = append(spec.Process.Env, "PROOT_NO_SECCOMP="+v)
+	enableSeccomp, _ := strconv.ParseBool(os.Getenv("RUNROOTLESS_SECCOMP"))
+	if !enableSeccomp {
+		spec.Process.Env = append(spec.Process.Env, "PROOT_NO_SECCOMP=1")
 	}
 	return nil
 }
