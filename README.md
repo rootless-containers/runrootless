@@ -8,21 +8,21 @@
 
 Requires: Go, runc
 
-```bash
-$ go get github.com/AkihiroSuda/runrootless
-$ $GOPATH/src/github.com/AkihiroSuda/runrootless/proot/install.sh
+```console
+user$ go get github.com/AkihiroSuda/runrootless
+user$ $GOPATH/src/github.com/AkihiroSuda/runrootless/install-proot.sh
 ```
 
 Future version should install a pre-built PRoot binary automatically on the first run.
 
 ### Usage
 
-Create an example CentOS 7 bundle:
+Create an example Ubuntu bundle:
 
-```
-$ cd ./examples/centos7
-$ ./prepare.sh
-$ ls -1F
+```console
+user$ cd ./examples/ubuntu
+user$ ./prepare.sh
+user$ ls -1F
 config.json
 prepare.sh
 rootfs/
@@ -30,18 +30,20 @@ rootfs/
 
 Make sure the bundle cannot be executed with the regular `runc`:
 
-```
-$ runc run foo
+```console
+user$ runc run foo
 rootless containers require user namespaces
 ```
 
 Make sure the bundle can be executed with `runrootless`, and you can install some software using `yum`:
 
-```
-$ runrootless run foo
-sh-4.2# yum install -y epel-release
-sh-4.2# yum install -y cowsay
-sh-4.2# cowsay hello rootless world
+```console
+user$ cd ./examples/ubuntu
+user$ ./prepare.sh
+user$ runrootless run ubuntu
+# apt update
+# apt install -y cowsay
+# /usr/games/cowsay hello rootless world
  ______________________
 < hello rootless world >
  ----------------------
@@ -50,6 +52,37 @@ sh-4.2# cowsay hello rootless world
             (__)\       )\/\
                 ||----w |
                 ||     ||
+```
+
+CentOS example:
+```console
+user$ cd ./examples/centos
+user$ ./prepare.sh
+user$ runrootless run centos
+sh-4.2# yum install -y epel-release
+sh-4.2# yum install -y cowsay
+sh-4.2# cowsay hello rootless world
+```
+
+Arbitrary Docker image example:
+```console
+user$ cd ./examples/docker-image
+user$ ./prepare.sh opensuse
+user$ runrootless run opensuse
+sh-4.3# zypper install cowsay
+sh-4.3# cowsay hello rootless world
+```
+
+runROOTLESS can be also executed inside Docker container, but `--privileged` is still required ( https://github.com/opencontainers/runc/issues/1456 )
+
+```console
+host$ docker run -it --rm --privileged akihirosuda/runrootless
+~ $ id
+uid=1000(user) gid=1000(user)
+~ $ cd ~/examples/ubuntu/
+~/examples/ubuntu $ ./prepare.sh
+~/examples/ubuntu $ runrootless run ubuntu
+#
 ```
 
 ### Environment variables
