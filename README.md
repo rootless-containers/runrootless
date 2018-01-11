@@ -35,7 +35,7 @@ user$ runc run foo
 rootless containers require user namespaces
 ```
 
-Make sure the bundle can be executed with `runrootless`, and you can install some software using `yum`:
+Make sure the bundle can be executed with `runrootless`, and you can install some software using `apt`:
 
 ```console
 user$ cd ./examples/ubuntu
