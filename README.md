@@ -64,6 +64,16 @@ sh-4.2# yum install -y cowsay
 sh-4.2# cowsay hello rootless world
 ```
 
+Alpine Linux example:
+```console
+user$ cd ./examples/alpine
+user$ ./prepare.sh
+user$ runrootless run alpine
+/ # apk update
+/ # apk add fortune
+/ # fortune
+```
+
 Arbitrary Docker image example:
 ```console
 user$ cd ./examples/docker-image
@@ -99,7 +109,6 @@ uid=1000(user) gid=1000(user)
 ## Known issues
 
 - `apt` / `dpkg` may crash when seccomp acceleration is enabled: https://github.com/AkihiroSuda/runrootless/issues/4
-- apk may not work: https://github.com/AkihiroSuda/runrootless/issues/3
 
 ## Future work
 
