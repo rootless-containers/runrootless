@@ -15,14 +15,16 @@ COPY . /go/src/github.com/AkihiroSuda/runrootless/
 RUN go build -o /runrootless github.com/AkihiroSuda/runrootless
 
 FROM alpine:3.7
-RUN adduser -u 1000 -D user && mkdir -p -m 0700 /run/user/1000 && chown 1000:1000 /run/user/1000
+RUN adduser -u 1000 -D user
 COPY --from=proot /proot /home/user/.runrootless/runrootless-proot
 COPY --from=runc /runc /home/user/bin/runc
 COPY --from=runrootless /runrootless /home/user/bin/runrootless
 COPY ./examples /home/user/examples
+RUN mkdir /home/user/run
 RUN chown -R user /home/user
 USER user
 WORKDIR /home/user
 ENV PATH=/home/user/bin:$PATH
-ENV XDG_RUNTIME_DIR=/run/user/1000
+# we avoid using /run/user/1000, as container runtime (e.g. containerd) may mount empty tmpfs on /run
+ENV XDG_RUNTIME_DIR=/home/user/run
 # note: --privileged is required to run this container: https://github.com/opencontainers/runc/issues/1456
