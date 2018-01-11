@@ -31,14 +31,35 @@ rootfs/
 Make sure the bundle cannot be executed with the regular `runc`:
 
 ```console
-user$ runc run foo
+user$ runc run ubuntu
 rootless containers require user namespaces
 ```
 
-Make sure the bundle can be executed with `runrootless`, and you can install some software using `apt`:
+Note that even with `runc spec --rootless`, you cannot execute `apt`:
+```console
+user$ rm config.json
+user$ runc spec --rootless
+user$ sed -i 's/"readonly": true/"readonly": false/' config.json
+user$ runc run ubuntu
+# apt update
+E: setgroups 65534 failed - setgroups (1: Operation not permitted)
+E: setegid 65534 failed - setegid (22: Invalid argument)
+E: seteuid 100 failed - seteuid (22: Invalid argument)
+E: setgroups 0 failed - setgroups (1: Operation not permitted)
+Reading package lists... Done
+W: chown to _apt:root of directory /var/lib/apt/lists/partial failed - SetupAPTPartialDirectory (22: Invalid argument)
+E: setgroups 65534 failed - setgroups (1: Operation not permitted)
+E: setegid 65534 failed - setegid (22: Invalid argument)
+E: seteuid 100 failed - seteuid (22: Invalid argument)
+E: setgroups 0 failed - setgroups (1: Operation not permitted)
+E: Method gave invalid 400 URI Failure message: Failed to setgroups - setgroups (1: Operation not permitted)
+E: Method http has died unexpectedly!
+E: Sub-process http returned an error code (112)_
+```
+
+With `runrootless`, you can execute `apt` successfully:
 
 ```console
-user$ cd ./examples/ubuntu
 user$ ./prepare.sh
 user$ runrootless run ubuntu
 # apt update
@@ -54,7 +75,9 @@ user$ runrootless run ubuntu
                 ||     ||
 ```
 
-CentOS example:
+### Other examples
+
+CentOS:
 ```console
 user$ cd ./examples/centos
 user$ ./prepare.sh
@@ -64,7 +87,7 @@ sh-4.2# yum install -y cowsay
 sh-4.2# cowsay hello rootless world
 ```
 
-Alpine Linux example:
+Alpine Linux:
 ```console
 user$ cd ./examples/alpine
 user$ ./prepare.sh
@@ -74,7 +97,7 @@ user$ runrootless run alpine
 / # fortune
 ```
 
-Arbitrary Docker image example:
+Arbitrary Docker image:
 ```console
 user$ cd ./examples/docker-image
 user$ ./prepare.sh opensuse

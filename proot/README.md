@@ -19,3 +19,8 @@ Following xattrs are used for storing decimal uid/gid strings:
 
 - `user.rootlesscontainers.uid`
 - `user.rootlesscontainers.gid`
+
+### support for chroot(relative_path)
+
+Currently, only chroot to the current root is supported.
+(This hack is required for running `apk`)
