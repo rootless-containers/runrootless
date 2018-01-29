@@ -1,0 +1,34 @@
+#! /usr/bin/env stap
+global targetEUID = -1;
+global targets
+
+probe begin {
+  targetEUID = euid()
+  targets[pid()] = cmdline_str()
+}
+
+probe kprocess.exec {
+  if (ppid() in targets) {
+    targets[pid()] = argstr
+  }
+}
+
+probe kprocess.exec_complete {
+  if (pid() in targets) {
+    if (euid() != targetEUID) {
+      if (euid() == 0) ansi_set_color(31) // red
+      // TODO: set color for non-subuids
+      printf("EUID=%d (!= %d), PID=%d, success=%d, retstr=%s, argstr=%s\n", euid(), targetEUID, pid(), success, retstr, targets[pid()])
+      if (euid() == 0) ansi_reset_color()
+    }
+  }
+}
+
+probe kprocess.release {
+  delete targets[released_pid]
+}
+
+probe end {
+  delete targets
+  delete targetEUID
+}
