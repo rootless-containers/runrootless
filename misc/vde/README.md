@@ -4,10 +4,10 @@ No root privilege nor SUID binary is required.
 
 ## Install VDE (vdeplug4)
 
-- https://github.com.rd235/s2argv-execs
-- https://github.com.rd235/vdeplug4
-- https://github.com.rd235/libslirp
-- https://github.com.rd235/vdeplug_slirp
+- https://github.com/rd235/s2argv-execs
+- https://github.com/rd235/vdeplug4 (depends on `s2argv-execs`)
+- https://github.com/rd235/libslirp
+- https://github.com/rd235/vdeplug_slirp (depends on `vdeplug4` and `libslirp`)
 
 An older version of VDE (VDE2) is available at Debian apt repo, but I haven't tested VDE2.
 

@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/AkihiroSuda/runrootless.svg)](https://travis-ci.org/AkihiroSuda/runrootless)
 
-## Quick start (No root privilege is required!)
+## Quick start (No root privileges nor SUID binaries are required!)
 
 ### Install
 
