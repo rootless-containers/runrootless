@@ -15,10 +15,9 @@ https://github.com/jorge-lip/PRoot/commit/10ca3e88dc1d2e2b45439b181a168af6b4053b
 
 ### persistent chown
 
-Following xattrs are used for storing decimal uid/gid strings:
+This is implemented by using `user.rootlesscontainers` xattrs.
 
-- `user.rootlesscontainers.uid`
-- `user.rootlesscontainers.gid`
+Please refer to https://rootlesscontaine.rs/ for the xattr specification.
 
 ### support for chroot(relative_path)
 

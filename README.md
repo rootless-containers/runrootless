@@ -148,5 +148,6 @@ This is hard than I initially thought...
 ## Legal notice
 
 - [`./proot/PRoot`](./proot/PRoot) originates from [PRoot](https://github.com/proot-me/PRoot) and hence licensed under [GPL v2](./proot/PRoot/COPYING)
+- [`./proot/PRoot/src/rootlesscontainers`](./proot/PRoot/src/rootlesscontainers) (protobuf definition) originates from https://rootlesscontaine.rs/ (Apache License 2.0)
 - [`./runccompat.go`](./runccompat.go) originates from [runc](https://github.com/opencontainers/runc) (Apache License 2.0)
 - Other files are licensed under Apache License 2.0

@@ -1,1 +1,10 @@
 **/rootfs
+**/*.d
+**/*.o
+proot/PRoot/src/.check_process_vm.res
+proot/PRoot/src/.check_seccomp_filter.res
+proot/PRoot/src/build.h
+proot/PRoot/src/care
+proot/PRoot/src/loader/loader
+proot/PRoot/src/loader/loader-m32
+proot/PRoot/src/proot
