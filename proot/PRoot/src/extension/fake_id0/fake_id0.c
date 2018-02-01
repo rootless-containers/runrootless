@@ -46,11 +46,78 @@
 
 #if defined(PERSISTENT_CHOWN)
 #include <unistd.h>
-#include <sys/xattr.h>
+#include <attr/xattr.h>
 #include "path/path.h"
-#define XATTR_USER_ROOTLESSCONTAINERS_UID "user.rootlesscontainers.uid"
-#define XATTR_USER_ROOTLESSCONTAINERS_GID "user.rootlesscontainers.gid"
-#endif
+#include "rootlesscontainers/rootlesscontainers.pb-c.h"
+#define XATTR_USER_ROOTLESSCONTAINERS "user.rootlesscontainers"
+
+// return 0 on success.
+int rootlesscontainers_get_xattr (int fd, const char *path, uid_t *uid, gid_t *gid) {
+	Rootlesscontainers__Resource *msg;
+	void *buf;
+	assert(fd >= 0 || path != NULL);
+	ssize_t bufsz = (path != NULL) ?
+	lgetxattr(path, XATTR_USER_ROOTLESSCONTAINERS, NULL, 0) :
+	fgetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS, NULL, 0);
+	// errno can be ENOATTR, EBADF... Typically not critical.
+	if (bufsz <= 0)
+		return bufsz;
+	buf = malloc(bufsz);
+	if (buf == NULL)
+		return -1;
+	bufsz = (path != NULL) ?
+		lgetxattr(path, XATTR_USER_ROOTLESSCONTAINERS, buf, bufsz) :
+		fgetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS, buf, bufsz);
+	if (bufsz <= 0)
+		return bufsz;
+	msg = rootlesscontainers__resource__unpack(NULL, bufsz, buf);
+	if (msg == NULL) {
+		free(buf);
+		return -1;
+	}
+	if (!msg->has_uid)
+		msg->uid = (uid_t)-1;
+	if (!msg->has_gid)
+		msg->gid = (gid_t)-1;
+	*uid = (uid_t)msg->uid;
+	*gid = (gid_t)msg->gid;
+	free(buf);
+	rootlesscontainers__resource__free_unpacked(msg, NULL);
+	return 0;
+}
+
+int rootlesscontainers_set_xattr (int fd, const char *path, uid_t uid, gid_t gid) {
+	int rc;
+	Rootlesscontainers__Resource msg = ROOTLESSCONTAINERS__RESOURCE__INIT;
+	void *buf;
+	size_t bufsz;
+	assert(fd >= 0 || path != NULL);
+	msg.has_uid = true;
+	msg.uid = (uint32_t)uid;
+	msg.has_gid = true;
+	msg.gid = (uint32_t)gid;
+	bufsz = rootlesscontainers__resource__get_packed_size(&msg);
+	buf = malloc(bufsz);
+	if (buf == NULL)
+		return -1;
+	rootlesscontainers__resource__pack(&msg, buf);
+	rc = (path != NULL) ?
+		lsetxattr(path, XATTR_USER_ROOTLESSCONTAINERS, buf, bufsz, 0):
+		fsetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS, buf, bufsz, 0);
+	free(buf);
+	return rc;
+}
+
+// ENOATTR is ignored
+int rootlesscontainers_remove_xattr (int fd, const char *path) {
+	assert(fd >= 0 || path != NULL);
+	int rc = (path != NULL) ?
+		lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS):
+		fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS);
+	return ( rc < 0 && errno == ENOATTR) ? 0 : rc;
+}
+
+#endif /* if defined(PERSISTENT_CHOWN) */
 
 typedef struct {
 	uid_t ruid;
@@ -282,7 +349,6 @@ static int handle_sysenter_end(Tracee *tracee, const Config *config)
 		int status;
 		int fd = -1; // shut up gcc uninitialization warning
 		char path[PATH_MAX];
-		char idstr[16];
 		bool with_path = (sysnum == PR_chown || sysnum == PR_chown32 || sysnum == PR_lchown || sysnum == PR_lchown32 || sysnum == PR_fchownat);
 #endif
 
@@ -320,48 +386,14 @@ static int handle_sysenter_end(Tracee *tracee, const Config *config)
 			fd = peek_reg(tracee, ORIGINAL, SYSARG_1);
 		}
 
-		// TODO: use macro for deduplication?
-		if (uid != config->ruid) {
-			if ( uid != (uid_t)-1 ) {
-				snprintf(idstr, sizeof(idstr), "%d", uid);
-				if (with_path) {
-					lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID);
-					status = lsetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID, idstr, strlen(idstr), 0);
-				} else {
-					fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID);
-					status = fsetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID, idstr, strlen(idstr), 0);
-				}
-				if (status < 0)
-					return status;
-			}
-		} else { // uid == config->ruid
-			if (with_path) {
-				lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID);
-			} else {
-				fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID);
-			}
-		}
+		// TODO: we can also remove xattr when [ug]id == -1 && the recoded one == config->r[ug]id
+		if (uid != config->ruid || gid != config->rgid)
+			status = rootlesscontainers_set_xattr(fd, with_path ? path : NULL, uid, gid);
+		else
+			status = rootlesscontainers_remove_xattr(fd, with_path ? path : NULL);
 
-		if (gid != config->rgid) {
-			if ( gid != (gid_t)-1 ) {
-				snprintf(idstr, sizeof(idstr), "%d", gid);
-				if (with_path) {
-					lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID);
-					status = lsetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID, idstr, strlen(idstr), 0);
-				} else {
-					fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID);
-					status = fsetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID, idstr, strlen(idstr), 0);
-				}
-				if (status < 0)
-					return status;
-			}
-		} else { // gid == config->rgid
-			if (with_path) {
-				lremovexattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID);
-			} else {
-				fremovexattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID);
-			}
-		}
+		if (status < 0)
+			return status;
 
 		/* this should always succeed */
 		poke_reg(tracee, uid_sysarg, getuid());
@@ -710,9 +742,12 @@ static int handle_sysexit_end(Tracee *tracee, Config *config)
 		uid_t uid;
 		gid_t gid;
 #if defined(PERSISTENT_CHOWN)
-		char uidstr[16], gidstr[16];
-		bool with_uid_xattr = false, with_gid_xattr=false;
+		int status;
+		char path[PATH_MAX];
 		bool with_path = !(sysnum == PR_fstat64 || sysnum == PR_fstat);
+		int fd = -1;
+		uid_t uid_xattr;
+		gid_t gid_xattr;
 #endif
 
 		/* Override only if it succeed.  */
@@ -750,12 +785,8 @@ static int handle_sysexit_end(Tracee *tracee, Config *config)
 			poke_uint32(tracee, address + offsetof_stat_gid(tracee), config->sgid);
 
 #if defined(PERSISTENT_CHOWN)
-		memset(&uidstr, 0, sizeof(uidstr)); // ensure nul-terminated string
-		memset(&gidstr, 0, sizeof(gidstr)); // ensure nul-terminated string
 		if (with_path) {
-			int status;
 			word_t input;
-			char path[PATH_MAX];
 			char guestpath[PATH_MAX];
 			int dirfd = AT_FDCWD;
 			if (sysnum == PR_fstatat64 || sysnum == PR_newfstatat) {
@@ -771,30 +802,16 @@ static int handle_sysexit_end(Tracee *tracee, Config *config)
 			status = translate_path(tracee, path, dirfd, guestpath, false);
 			if (status < 0)
 				return status;
-			with_uid_xattr = lgetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_UID, &uidstr, sizeof(uidstr)) > 0;
-			with_gid_xattr = lgetxattr(path, XATTR_USER_ROOTLESSCONTAINERS_GID, &gidstr, sizeof(gidstr)) > 0;
 		} else {
-			int fd = peek_reg(tracee, ORIGINAL, SYSARG_1);
-			with_uid_xattr = fgetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_UID, &uidstr, sizeof(uidstr)) > 0;
-			with_gid_xattr = fgetxattr(fd, XATTR_USER_ROOTLESSCONTAINERS_GID, &gidstr, sizeof(gidstr)) > 0;
+			fd = peek_reg(tracee, ORIGINAL, SYSARG_1);
 		}
-		if (with_uid_xattr) {
-			char *endptr;
-			uid_t uid_xattr = strtol(uidstr, &endptr, 10);
-			if (endptr == uidstr) {
-				errno = EINVAL;
-				return -1;
-			}
-			poke_uint32(tracee, address + offsetof_stat_uid(tracee), uid_xattr);
-		}
-		if (with_gid_xattr) {
-			char *endptr;
-			gid_t gid_xattr = strtol(gidstr, &endptr, 10);
-			if (endptr == gidstr) {
-				errno = EINVAL;
-				return -1;
-			}
-			poke_uint32(tracee, address + offsetof_stat_gid(tracee), gid_xattr);
+		status = rootlesscontainers_get_xattr(fd, with_path ? path: NULL, &uid_xattr, &gid_xattr);
+		// error is not critical, typically. e.g. ENOATTR
+		if (status >= 0) {
+			if (uid_xattr != (uid_t)-1)
+				poke_uint32(tracee, address + offsetof_stat_uid(tracee), uid_xattr);
+			if (gid_xattr != (gid_t)-1)
+				poke_uint32(tracee, address + offsetof_stat_gid(tracee), gid_xattr);
 		}
 #endif
 
