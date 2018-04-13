@@ -106,6 +106,15 @@ sh-4.3# zypper install cowsay
 sh-4.3# cowsay hello rootless world
 ```
 
+Arbitrary container image, using [skopeo](https://github.com/projectatomic/skopeo) and [umoci](https://github.com/openSUSE/umoci).
+umoci and runROOTLESS share emulated `chown(2)` information via `user.rootlesscontainers` xattr.
+```console
+user$ cd ./examples/skopeo-umoci
+user$ ./prepare.sh docker://ubuntu
+user$ cd umoci-bundle
+user$ runrootless run ubuntu
+```
+
 runROOTLESS can be also executed inside Docker container, but `--privileged` is still required ( https://github.com/opencontainers/runc/issues/1456 )
 
 ```console

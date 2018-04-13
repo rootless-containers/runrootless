@@ -1,3 +1,5 @@
 rootfs
 runrootless
 config.json
+skopeo-tmp
+umoci-bundle
