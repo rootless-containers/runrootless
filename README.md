@@ -1,6 +1,6 @@
 # runROOTLESS: rootless OCI container runtime with ptrace hacks
 
-[![Build Status](https://travis-ci.org/AkihiroSuda/runrootless.svg)](https://travis-ci.org/AkihiroSuda/runrootless)
+[![Build Status](https://travis-ci.org/rootless-containers/runrootless.svg)](https://travis-ci.org/rootless-containers/runrootless)
 
 ## Quick start (No root privileges nor SUID binaries are required!)
 
@@ -9,8 +9,8 @@
 Requires: Go, runc
 
 ```console
-user$ go get github.com/AkihiroSuda/runrootless
-user$ $GOPATH/src/github.com/AkihiroSuda/runrootless/install-proot.sh
+user$ go get github.com/rootless-containers/runrootless
+user$ $GOPATH/src/github.com/rootless-containers/runrootless/install-proot.sh
 ```
 
 Future version should install a pre-built PRoot binary automatically on the first run.
@@ -125,13 +125,13 @@ uid=1000(user) gid=1000(user)
 ## How it works
 
 - Transform a regular `config.json` to rootless one, and create a new OCI runtime bundle with it.
-- Bind-mount a static [PRoot](proot) binary so as to allow `apt`/`yum` commands.
+- Bind-mount a static [PRoot](https://github.com/rootless-containers/PRoot) binary so as to allow `apt`/`yum` commands.
 - Inject the PRoot binary to `process.args`.
 - Invoke plain runC.
 
 ## Known issues
 
-- `apt` / `dpkg` may crash when seccomp acceleration is enabled: https://github.com/AkihiroSuda/runrootless/issues/4
+- `apt` / `dpkg` may crash when seccomp acceleration is enabled: https://github.com/rootless-containers/runrootless/issues/4
 
 ## Future work
 
@@ -144,10 +144,3 @@ Also, it would require YAMA to be disabled.
 ### Reimplement PRoot in Go
 
 This is hard than I initially thought...
-
-## Legal notice
-
-- [`./proot/PRoot`](./proot/PRoot) originates from [PRoot](https://github.com/proot-me/PRoot) and hence licensed under [GPL v2](./proot/PRoot/COPYING)
-- [`./proot/PRoot/src/rootlesscontainers`](./proot/PRoot/src/rootlesscontainers) (protobuf definition) originates from https://rootlesscontaine.rs/ (Apache License 2.0)
-- [`./runccompat.go`](./runccompat.go) originates from [runc](https://github.com/opencontainers/runc) (Apache License 2.0)
-- Other files are licensed under Apache License 2.0
