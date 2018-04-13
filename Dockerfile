@@ -2,8 +2,11 @@ FROM debian:9 AS proot
 RUN apt-get update && apt-get install -q -y build-essential git libseccomp-dev libtalloc-dev \
  # deps for PERSISTENT_CHOWN extension
  libprotobuf-c-dev libattr1-dev
-ADD proot/PRoot /PRoot
-RUN cd PRoot/src && make && mv proot / && make clean
+RUN git clone https://github.com/rootless-containers/PRoot.git \
+  && cd PRoot \
+  && git checkout 081bb63955eb4378e53cf4d0eb0ed0d3222bf66e \
+  && cd src \
+  && make && mv proot / && make clean
 
 FROM golang:1.9-alpine AS runc
 RUN apk add --no-cache git g++ linux-headers
@@ -13,8 +16,8 @@ RUN git clone https://github.com/opencontainers/runc.git /go/src/github.com/open
   && go build -o /runc .
 
 FROM golang:1.9-alpine AS runrootless
-COPY . /go/src/github.com/AkihiroSuda/runrootless/
-RUN go build -o /runrootless github.com/AkihiroSuda/runrootless
+COPY . /go/src/github.com/rootless-containers/runrootless/
+RUN go build -o /runrootless github.com/rootless-containers/runrootless
 
 FROM alpine:3.7
 RUN adduser -u 1000 -D user

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/AkihiroSuda/runrootless/bundle"
+	"github.com/rootless-containers/runrootless/bundle"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
